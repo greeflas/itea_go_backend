@@ -2,6 +2,8 @@ package handler
 
 import (
 	"encoding/json"
+	"github.com/greeflas/itea_go_backend/internal/repository"
+	"github.com/greeflas/itea_go_backend/internal/service"
 	"log"
 	"net/http"
 
@@ -9,21 +11,26 @@ import (
 	"github.com/greeflas/itea_go_backend/pkg/server"
 )
 
-type User struct {
-	Id    uuid.UUID `json:"id"`
-	Email string    `json:"email"`
+type UserListItem struct {
+	Id    string `json:"id"`
+	Email string `json:"email"`
 }
 
 type UserHandler struct {
-	logger *log.Logger
-
-	users []*User
+	logger         *log.Logger
+	userRepository *repository.UserInMemoryRepository
+	userService    *service.UserService
 }
 
-func NewUserHandler(logger *log.Logger) *UserHandler {
+func NewUserHandler(
+	logger *log.Logger,
+	userRepository *repository.UserInMemoryRepository,
+	userService *service.UserService,
+) *UserHandler {
 	return &UserHandler{
-		logger: logger,
-		users:  make([]*User, 0),
+		logger:         logger,
+		userRepository: userRepository,
+		userService:    userService,
 	}
 }
 
@@ -51,18 +58,32 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) handleGet(w http.ResponseWriter, r *http.Request) error {
-	return json.NewEncoder(w).Encode(h.users)
+	users := h.userRepository.GetAll()
+
+	listItems := make([]*UserListItem, len(users))
+	for _, user := range users {
+		listItem := &UserListItem{
+			Id:    user.Id.String(),
+			Email: user.Email,
+		}
+		listItems = append(listItems, listItem)
+	}
+
+	return json.NewEncoder(w).Encode(listItems)
 }
 
 func (h *UserHandler) handlePost(w http.ResponseWriter, r *http.Request) error {
-	user := new(User)
+	args := new(service.NewUserArgs)
 
-	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
 		return err
 	}
 	defer r.Body.Close()
 
-	h.users = append(h.users, user)
+	// TODO: validate args
+	if err := h.userService.Create(args); err != nil {
+		return err
+	}
 
 	w.WriteHeader(http.StatusCreated)
 
@@ -77,24 +98,17 @@ func (h *UserHandler) handlePatch(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
-	var user *User
+	args := new(service.UpdatedUserArgs)
 
-	for _, u := range h.users {
-		if u.Id == userId {
-			user = u
-			break
-		}
-	}
-
-	if user == nil {
-		server.SendNotFound(w)
-		return nil
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
 		return err
 	}
 	defer r.Body.Close()
+
+	// TODO: validate args
+	if err := h.userService.Update(userId, args); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -107,21 +121,9 @@ func (h *UserHandler) handleDelete(w http.ResponseWriter, r *http.Request) error
 		return err
 	}
 
-	userIdx := -1
-
-	for index, u := range h.users {
-		if u.Id == userId {
-			userIdx = index
-			break
-		}
+	if err := h.userService.Delete(userId); err != nil {
+		return err
 	}
-
-	if userIdx == -1 {
-		server.SendNotFound(w)
-		return nil
-	}
-
-	h.users = append(h.users[:userIdx], h.users[userIdx+1:]...)
 
 	w.WriteHeader(http.StatusNoContent)
 
