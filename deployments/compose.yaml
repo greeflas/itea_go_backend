@@ -1,0 +1,10 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: itea_backend
+    ports:
+      - 5432:5432
+    volumes:
+      - ./init-db:/docker-entrypoint-initdb.d

@@ -1,11 +1,17 @@
 package model
 
-import "github.com/google/uuid"
+import (
+	"database/sql"
+	"github.com/google/uuid"
+	"github.com/uptrace/bun"
+)
 
 type User struct {
-	Id           uuid.UUID
+	bun.BaseModel `bun:"table:users,alias:u"`
+
+	Id           uuid.UUID `bun:",pk"`
 	Email        string
-	PasswordHash string
+	PasswordHash sql.NullString
 }
 
 func NewUser(id uuid.UUID, email string) *User {

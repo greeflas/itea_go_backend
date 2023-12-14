@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"github.com/google/uuid"
 	"github.com/greeflas/itea_go_backend/internal/model"
 	"github.com/greeflas/itea_go_backend/internal/repository"
@@ -16,14 +17,14 @@ type UpdatedUserArgs struct {
 }
 
 type UserService struct {
-	userRepository *repository.UserInMemoryRepository
+	userRepository *repository.UserBunRepository
 }
 
-func NewUserService(userRepository *repository.UserInMemoryRepository) *UserService {
+func NewUserService(userRepository *repository.UserBunRepository) *UserService {
 	return &UserService{userRepository: userRepository}
 }
 
-func (s *UserService) Create(args *NewUserArgs) error {
+func (s *UserService) Create(ctx context.Context, args *NewUserArgs) error {
 	id, err := uuid.Parse(args.Id)
 	if err != nil {
 		return err
@@ -34,27 +35,25 @@ func (s *UserService) Create(args *NewUserArgs) error {
 		args.Email,
 	)
 
-	s.userRepository.Create(user)
-
-	return nil
+	return s.userRepository.Create(ctx, user)
 }
 
-func (s *UserService) Update(id uuid.UUID, args *UpdatedUserArgs) error {
-	user, err := s.userRepository.GetById(id)
+func (s *UserService) Update(ctx context.Context, id uuid.UUID, args *UpdatedUserArgs) error {
+	user, err := s.userRepository.GetById(ctx, id)
 	if err != nil {
 		return err
 	}
 
 	user.ChangeEmail(args.Email)
 
-	return nil
+	return s.userRepository.Update(ctx, user)
 }
 
-func (s *UserService) Delete(id uuid.UUID) error {
-	user, err := s.userRepository.GetById(id)
+func (s *UserService) Delete(ctx context.Context, id uuid.UUID) error {
+	user, err := s.userRepository.GetById(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	return s.userRepository.Delete(user)
+	return s.userRepository.Delete(ctx, user)
 }

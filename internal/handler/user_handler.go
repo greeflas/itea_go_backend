@@ -18,13 +18,13 @@ type UserListItem struct {
 
 type UserHandler struct {
 	logger         *log.Logger
-	userRepository *repository.UserInMemoryRepository
+	userRepository *repository.UserBunRepository
 	userService    *service.UserService
 }
 
 func NewUserHandler(
 	logger *log.Logger,
-	userRepository *repository.UserInMemoryRepository,
+	userRepository *repository.UserBunRepository,
 	userService *service.UserService,
 ) *UserHandler {
 	return &UserHandler{
@@ -38,18 +38,22 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		if err := h.handleGet(w, r); err != nil {
+			h.logger.Println(err)
 			server.SendInternalServerError(w)
 		}
 	case http.MethodPost:
 		if err := h.handlePost(w, r); err != nil {
+			h.logger.Println(err)
 			server.SendInternalServerError(w)
 		}
 	case http.MethodPatch:
 		if err := h.handlePatch(w, r); err != nil {
+			h.logger.Println(err)
 			server.SendInternalServerError(w)
 		}
 	case http.MethodDelete:
 		if err := h.handleDelete(w, r); err != nil {
+			h.logger.Println(err)
 			server.SendInternalServerError(w)
 		}
 	default:
@@ -58,7 +62,12 @@ func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) handleGet(w http.ResponseWriter, r *http.Request) error {
-	users := h.userRepository.GetAll()
+	ctx := r.Context()
+
+	users, err := h.userRepository.GetAll(ctx)
+	if err != nil {
+		return err
+	}
 
 	listItems := make([]*UserListItem, len(users))
 	for _, user := range users {
@@ -73,6 +82,8 @@ func (h *UserHandler) handleGet(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (h *UserHandler) handlePost(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
 	args := new(service.NewUserArgs)
 
 	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
@@ -81,7 +92,7 @@ func (h *UserHandler) handlePost(w http.ResponseWriter, r *http.Request) error {
 	defer r.Body.Close()
 
 	// TODO: validate args
-	if err := h.userService.Create(args); err != nil {
+	if err := h.userService.Create(ctx, args); err != nil {
 		return err
 	}
 
@@ -91,6 +102,8 @@ func (h *UserHandler) handlePost(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (h *UserHandler) handlePatch(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
 	id := r.URL.Query().Get("id")
 
 	userId, err := uuid.Parse(id)
@@ -106,7 +119,7 @@ func (h *UserHandler) handlePatch(w http.ResponseWriter, r *http.Request) error 
 	defer r.Body.Close()
 
 	// TODO: validate args
-	if err := h.userService.Update(userId, args); err != nil {
+	if err := h.userService.Update(ctx, userId, args); err != nil {
 		return err
 	}
 
@@ -114,6 +127,8 @@ func (h *UserHandler) handlePatch(w http.ResponseWriter, r *http.Request) error 
 }
 
 func (h *UserHandler) handleDelete(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
 	id := r.URL.Query().Get("id")
 
 	userId, err := uuid.Parse(id)
@@ -121,7 +136,7 @@ func (h *UserHandler) handleDelete(w http.ResponseWriter, r *http.Request) error
 		return err
 	}
 
-	if err := h.userService.Delete(userId); err != nil {
+	if err := h.userService.Delete(ctx, userId); err != nil {
 		return err
 	}
 
